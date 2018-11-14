@@ -13,13 +13,5 @@
     register: reboot_hint
 
   - name: reboot
-    shell: ( sleep 3 && /sbin/reboot & )
-    async: 0
-    poll: 0 
+    reboot:
     when: reboot_hint.stdout.find("reboot") != -1
-    register: reboot
-  
-  - name: Wait for the server to come back
-    wait_for_connection:
-      delay: 15
-      timeout: 300
