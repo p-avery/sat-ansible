@@ -11,7 +11,7 @@
 
   - name: schedule next patch group
     uri:
-      url: "https://{{ tower_host }}/api/v2/workflow_job_templates/{{ next_sat_env }}/schedules/"
+      url: "https://tower.averyhq.int/api/v2/workflow_job_templates/{{ next_sat_env }}/schedules/"
       method: POST
       body:
         name: "Linux_patching_{{ next_cycle_date }}"

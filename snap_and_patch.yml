@@ -1,0 +1,65 @@
+- hosts: all
+  serial: 1
+  tasks:
+
+  - block:
+    - name: create snapshot
+      vmware_guest_snapshot:
+        name: "{{ inventory_hostname }}"
+        state: present
+        snapshot_name: pre-upgrade
+      connection: local
+      become: false
+
+    - name: upgrade all packages
+      package:
+        name: *
+        state: latest
+
+    - name: Check for reboot hint.
+      shell: LAST_KERNEL=$(rpm -q --last kernel | awk 'NR==1{sub(/kernel-/,""); print $1}'); CURRENT_KERNEL=$(uname -r); if [ $LAST_KERNEL != $CURRENT_KERNEL ]; then echo 'reboot'; else echo 'no'; fi
+      ignore_errors: true
+      register: reboot_hint
+
+    - name: reboot node
+      shell: sleep 5 && shutdown -r now "Reboot triggered by ansible"
+      async: 1
+      poll: 0
+      ignore_errors: true
+      when: reboot_hint.stdout.find("reboot") != -1
+      register: rebooting
+
+    - name: wait for the server to restart
+      wait_for_connection:
+        connect_timeout: 20
+        sleep: 5
+        delay: 15
+        timeout: 300
+      when: reboot_hint.stdout.find("reboot") != -1
+
+    - name: remove snapshot
+      vmware_guest_snapshot:
+        name: "{{ inventory_hostname }}"
+        state: absent
+        snapshot_name: pre-upgrade
+      connection: local
+      become: false
+
+    rescue:
+    - name: restore snapshot
+      vmware_guest_snapshot:
+        name: "{{ inventory_hostname }}"
+        state: revert
+        snapshot_name: pre-upgrade
+      connection: local
+      become: false
+
+    - name: power on guest
+      vmware_guest:
+        name: "{{ inventory_hostname }}"
+        state: poweredon
+      connection: local
+      become: false
+
+    - fail:
+        msg: "{{ inventory_hostname }} failed and was restored from its snapshot"
