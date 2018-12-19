@@ -3,7 +3,7 @@
   tasks:
   - name: upgrade all packages
     yum: 
-      name: * 
+      name: '*'
       state: latest
 
   - name: Check for reboot hint.
