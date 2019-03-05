@@ -1,17 +1,32 @@
 - name: Patch non HA Linux Servers
   hosts: all
   tasks:
-  - name: upgrade all packages
-    yum: 
-      name: '*'
-      state: latest
+  tasks:
+    - name: Ensure Yum-utils is installed
+      yum:
+        name: yum-utils
+        state: present
 
-  - name: Check for reboot hint.
-    shell: LAST_KERNEL=$(rpm -q --last kernel | awk 'NR==1{sub(/kernel-/,""); print $1}'); CURRENT_KERNEL=$(uname -r); if [ $LAST_KERNEL != $CURRENT_KERNEL ]; then echo 'reboot'; else echo 'no'; fi
-    ignore_errors: true
-    register: reboot_hint
+    - name: check for updates (yum)
+      yum: 
+        list: updates 
+        update_cache: true
+      register: yum_updates
 
-  - name: reboot
-    reboot:
-    when: reboot_hint.stdout.find("reboot") != -1
+    - when: yum_updates.results|length > 0
+      block:    
+     - name: upgrade all packages
+        yum: 
+          name: '*' 
+          state: latest
+
+      - name: check if reboot is required
+        shell: needs-restarting -r
+        failed_when: false
+        changed_when: false
+        register: reboot_required
+  
+      - name: reboot
+        reboot:
+        when: reboot_required.rc != 0
 
